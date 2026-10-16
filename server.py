@@ -683,6 +683,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise RequestError(HTTPStatus.NOT_FOUND, "Partida não encontrada.")
             timestamp = now_ms()
             if action == "goal":
+                if match.get("state") == "finished":
+                    raise RequestError(HTTPStatus.CONFLICT, "Não é possível alterar o placar de uma partida encerrada.")
                 side = body.get("side")
                 if side not in {"home", "away"}:
                     raise RequestError(HTTPStatus.BAD_REQUEST, "Selecione o lado do gol.")

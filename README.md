@@ -42,14 +42,16 @@ O servidor usa HTTP simples e escuta na rede local para permitir o uso em outros
 
 ## Funcionalidades
 
-- **Jogos:** cadastro, edição, busca, filtros, placar, período, acréscimos, cronômetro, pausa, intervalo, retomada, encerramento e exclusão.
+- **Jogos:** cada partida reúne em um único card identificação, campeonato/arte, cinegrafista, placar, período, acréscimos, cronômetro e controles; cadastro, edição e exclusão continuam disponíveis.
 - **Partidas simultâneas:** o placar, relógio, estado, cinegrafista, campeonato e URL são mantidos por identificador de partida.
 - **Escudos / Times:** cadastro, siglas únicas, pesquisa, ordenação e upload de escudo.
-- **Cinegrafistas:** cadastro, pesquisa, telefone, observações e chave opcional com armazenamento no Keychain do macOS. A chave não é enviada a listas nem à saída gráfica.
-- **Artes dos Campeonatos:** cadastro e substituição de artes para as telas de intervalo. Se não houver arte, a saída mostra uma composição neutra identificada.
+- **Cinegrafistas:** cards com nome, telefone e observações; cadastro e edição também permitem guardar uma chave opcional no Keychain do macOS. A chave não é exibida nos cards nem enviada à saída gráfica.
+- **Artes dos Campeonatos:** cada card permite vincular uma ou mais partidas à arte de intervalo; durante o intervalo, a saída exibe somente a imagem associada, sem placar ou textos sobrepostos. Se não houver imagem, a saída fica com o fundo preto neutro.
 - **Estúdio do Placar:** configuração da paleta da composição e prévias.
 - **Console de transmissão:** link independente por jogo e instruções para OBS.
 - **Acessibilidade e telas estreitas:** navegação móvel, formulários empilhados e controles utilizáveis por toque/teclado.
+- **Formulários sob demanda:** cadastros e edições só aparecem quando solicitados; ao editar uma partida, o formulário ocupa temporariamente o lugar do card daquela partida.
+- **Partidas encerradas:** placar e acréscimos ficam bloqueados; remover um gol exige confirmação.
 
 Uma partida de demonstração em andamento e outra em intervalo são criadas na primeira inicialização, com dados claramente identificados como demonstração. Esses dados podem ser editados ou removidos. As imagens enviadas são validadas como PNG/JPG/WebP (até 3 MB) e armazenadas no banco SQLite local.
 
@@ -78,7 +80,7 @@ O link público exibe apenas a partida correspondente. As atualizações são en
 ## Regras do cronômetro
 
 - Iniciar começa o período selecionado; pausar congela o tempo daquela partida.
-- Entrar em intervalo interrompe o relógio e troca apenas a saída daquela partida para a tela de descanso.
+- Entrar em intervalo interrompe o relógio e troca apenas a saída daquela partida para a tela de descanso, que exibe apenas a arte associada.
 - Voltar do intervalo inicia o segundo tempo em `00:00`, preservando placar e acréscimos.
 - Encerrar define o período final. Zerar exige confirmação, retorna ao estado não iniciado e preserva os gols.
 - A seleção manual do intervalo, encerramento ou segundo tempo aciona a transição de estado correspondente.
@@ -98,5 +100,9 @@ Os escudos e materiais oficiais ainda precisam ser fornecidos ou autorizados. O 
 ## Validação e pendências
 
 Com autorização, foi feita uma validação manual em ambiente temporário: API iniciou e serviu as páginas; cadastro/edição/exclusão de time funcionou; duas partidas mantiveram placares e estados independentes; a troca para intervalo atualizou a saída por SSE sem recarregar; os dados sobreviveram ao reinício do servidor; e as telas não apresentaram overflow horizontal nos viewports de 375, 768 e 1280 px. A página de saída normal foi conferida com fundo CSS transparente.
+
+Na revisão da interface, os jogos foram conferidos como cards completos sem busca/filtro, os cinegrafistas como cards de informações e as artes com controle de vínculo para partidas. O vínculo enviou uma atualização `PUT` para a partida e foi conferido com a chamada interceptada para não alterar os dados locais. As três telas foram conferidas a 375 px sem overflow horizontal.
+
+A partida encerrada não permite editar placar ou acréscimos; uma tentativa pela API retornou HTTP 409 sem alterar o placar. Cancelar a confirmação para remover um gol também preservou o placar.
 
 Não foram executados testes automatizados. Ainda precisam de validação no ambiente real: gravação e leitura de uma chave de teste no Keychain, abertura como Browser Source no OBS, acesso em um celular físico e substituição das artes/escudos pelos ativos oficiais autorizados. A prévia de vídeo é apenas ilustrativa e não há integração de transmissão ao vivo.
