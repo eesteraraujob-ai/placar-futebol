@@ -82,7 +82,7 @@ async function api(path, options = {}) {
   const method = options.method || "GET";
   const headers = { ...(options.headers || {}) };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
-  if (["POST", "PUT", "DELETE", "PATCH"].includes(method) && path !== "/api/login") {
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
     headers["X-FAF-Action"] = "1";
   }
   const response = await fetch(path, {
@@ -163,34 +163,6 @@ function artworkMarkup(item, className = "") {
   </div>`;
 }
 
-function loginScreen(message = "") {
-  app.innerHTML = `<main class="login-screen">
-    <form id="login-form" class="login-card">
-      <div class="brand-mark">FAF</div><p class="eyebrow">CONTROLE DE PLACAR</p>
-      <h1>Acesso administrativo</h1><p class="muted">Informe o PIN apresentado ao iniciar o servidor.</p>
-      ${message ? `<div class="form-error" role="alert">${escapeHtml(message)}</div>` : ""}
-      <label class="field">PIN de acesso<input name="pin" type="password" required autocomplete="current-password" inputmode="text" autofocus></label>
-      <button class="button button-primary full-width" type="submit">Entrar ${icon("arrow")}</button>
-      <p class="small muted">As saídas do placar são públicas na rede local. O painel administrativo exige PIN.</p>
-    </form>
-  </main>`;
-  app.querySelector("#login-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const pin = new FormData(event.currentTarget).get("pin");
-    const button = event.currentTarget.querySelector("button");
-    button.disabled = true;
-    button.textContent = "Verificando…";
-    try {
-      await api("/api/login", { method: "POST", body: { pin } });
-      await loadData();
-      renderShell();
-      connectAdminEvents();
-    } catch (error) {
-      loginScreen(error.message);
-    }
-  });
-}
-
 async function loadData() {
   const names = ["matches", "teams", "cameramen", "competitions", "settings"];
   const [entries, time] = await Promise.all([
@@ -240,10 +212,10 @@ function renderShell() {
         ${navItems.map(([page, label, symbol]) => `<button class="nav-link ${state.page === page ? "active" : ""}" data-page="${page}">${icon(symbol)}<span>${label}</span></button>`).join("")}
       </nav>
       <div class="sidebar-section"><span class="eyebrow">AMBIENTE</span><p>Console de transmissão</p><span class="mode-badge"><i></i> MODO LOCAL</span></div>
-      <div class="sidebar-bottom"><button class="nav-link" data-action="help">${icon("help")}<span>Ajuda e atalhos</span></button><button class="logout-button" data-action="logout">${icon("logout")} Sair do painel</button><span>FAF / OPERAÇÃO</span></div>
+      <div class="sidebar-bottom"><button class="nav-link" data-action="help">${icon("help")}<span>Ajuda e atalhos</span></button><span>FAF / OPERAÇÃO</span></div>
     </aside>
     <main class="main-area">
-      <header class="topbar"><button class="icon-button mobile-menu" data-action="toggle-nav" aria-label="Abrir menu">${icon("menu")}</button><div class="breadcrumb">TRANSMISSÃO / ${heading.toUpperCase()}</div><div class="topbar-right"><span class="top-chip"><i></i> PRÉVIA LOCAL</span><span>Administrador</span><button class="icon-button top-logout" data-action="logout" aria-label="Sair">${icon("logout")}</button></div></header>
+      <header class="topbar"><button class="icon-button mobile-menu" data-action="toggle-nav" aria-label="Abrir menu">${icon("menu")}</button><div class="breadcrumb">TRANSMISSÃO / ${heading.toUpperCase()}</div><div class="topbar-right"><span class="top-chip"><i></i> PRÉVIA LOCAL</span><span>PAINEL LOCAL</span></div></header>
       <div class="page-content">
         <div class="page-heading"><div><p class="eyebrow">FAF / TRANSMISSÃO</p><h1>${heading}</h1><p class="muted">${description}</p></div>${pageAction()}</div>
         <section id="page-view">${renderPage()}</section>
@@ -293,7 +265,7 @@ function renderGames() {
   const editingMatch = state.editingMatch ? selectedMatch() : null;
   return `<div class="games-overview">
     <div class="section-caption"><span>PARTIDAS</span><span>${matches.length} ${matches.length === 1 ? "JOGO" : "JOGOS"}</span></div>
-    ${editingMatch ? renderMatchForm(editingMatch) : ""}
+    ${state.editingMatch ? renderMatchForm(editingMatch) : ""}
     ${matches.length ? matches.map((match) => {
       if (state.editingMatch && match.id === editingMatch?.id) return "";
       return renderMatchConsole(match);
@@ -320,7 +292,7 @@ function renderMatchConsole(match) {
       <div class="score-correction"><span>Corrigir ${escapeHtml(away.code)}</span><button class="icon-button compact" data-action="goal" data-id="${match.id}" data-side="away" data-delta="-1" aria-label="Remover um gol de ${escapeHtml(away.name)}" ${finished ? "disabled" : ""}>${icon("minus")}</button></div>
     </div>
     <div class="timer-panel">
-      <div class="timer-display"><span class="eyebrow">CRONÔMETRO · ${escapeHtml(labels[match.state]?.toUpperCase() || "")}</span><strong data-timer="${match.id}">${formatClock(timerSeconds(match))}</strong></div>
+      <div class="timer-display"><strong data-timer="${match.id}">${formatClock(timerSeconds(match))}</strong></div>
       <div class="timer-buttons">
         ${match.state === "live" ? `<button class="button" data-action="match-pause" data-id="${match.id}">${icon("pause")} Pausar</button>` : ""}
         ${match.state === "scheduled" ? `<button class="button button-primary" data-action="match-start" data-id="${match.id}">${icon("play")} Iniciar partida</button>` : ""}
@@ -525,15 +497,6 @@ function bindShellEvents() {
   app.querySelectorAll("[data-action='close-nav']").forEach((element) => element.addEventListener("click", () => {
     state.mobileNav = false;
     renderShell();
-  }));
-  app.querySelectorAll("[data-action='logout']").forEach((element) => element.addEventListener("click", async () => {
-    try {
-      await api("/api/logout", { method: "POST", body: {} });
-      adminEvents?.close();
-      loginScreen();
-    } catch (error) {
-      notifyUser(error.message, "error");
-    }
   }));
   app.querySelectorAll("[data-action='help']").forEach((element) => element.addEventListener("click", () => document.querySelector("#help-dialog").showModal()));
   app.querySelectorAll("[data-action='close-help']").forEach((element) => element.addEventListener("click", () => document.querySelector("#help-dialog").close()));
@@ -912,11 +875,6 @@ function tickOverlayClock() {
     return;
   }
   try {
-    const session = await api("/api/session");
-    if (!session.authenticated) {
-      loginScreen();
-      return;
-    }
     await loadData();
     renderShell();
     connectAdminEvents();

@@ -25,20 +25,15 @@ pip install -r requirements.txt
 python server.py
 ```
 
-O servidor exibe os endereços local e da rede e um PIN administrativo temporário. Abra o endereço local no navegador e informe o PIN. Para definir um PIN persistente antes de iniciar:
-
-```bash
-export FAF_ADMIN_PIN="escolha-um-pin-forte"
-python server.py
-```
+O servidor exibe os endereços local e da rede. Abra o endereço local no navegador; o painel inicia diretamente, sem login ou PIN.
 
 É possível alterar a porta definindo `FAF_PORT`; a porta padrão é `8765`. O diretório `data/`, criado na primeira inicialização, contém o banco local e está excluído do controle de versão. `FAF_DATA_DIR` permite escolher outro diretório de dados.
 
 ### Acesso pelo celular
 
-Com computador e celular na mesma rede Wi-Fi, abra no celular o endereço de rede local que o servidor imprimir e entre com o PIN. O painel administrativo exige PIN; a saída de transmissão é somente de leitura e não exige login.
+Com computador e celular na mesma rede Wi-Fi, abra no celular o endereço de rede local que o servidor imprimir. O painel e as saídas de transmissão não exigem login.
 
-O servidor usa HTTP simples e escuta na rede local para permitir o uso em outros dispositivos. Use apenas uma rede confiável, não encaminhe essa porta à internet e não compartilhe o PIN. HTTP não cifra o PIN durante o trânsito pela rede; para acesso fora de uma LAN confiável, será necessário adicionar HTTPS e uma política de acesso apropriada.
+O servidor usa HTTP simples e escuta na rede local para permitir o uso em outros dispositivos. O painel não tem autenticação: qualquer pessoa com acesso ao endereço pode ver e alterar partidas, gerenciar cadastros e solicitar a exibição de chaves de transmissão guardadas. Use apenas uma rede confiável e não encaminhe essa porta à internet.
 
 ## Funcionalidades
 
@@ -71,9 +66,9 @@ O link público exibe apenas a partida correspondente. As atualizações são en
 
 - Os registros e os arquivos de imagem são persistidos em `data/faf.sqlite3`.
 - O cronômetro usa o horário do servidor e o tempo acumulado, não um contador local, para se recuperar de recargas.
-- A chave de transmissão é salva no Keychain do macOS via `keyring` e só pode ser consultada pelo painel autenticado, mediante ação explícita de revelar.
+- A chave de transmissão é salva no Keychain do macOS via `keyring`; o painel não tem login, então qualquer pessoa com acesso ao serviço pode solicitar que uma chave guardada seja revelada.
 - A integração com o YouTube não está implementada; cadastrar uma chave não inicia uma transmissão.
-- O PIN é aleatório por inicialização se `FAF_ADMIN_PIN` não estiver definido. PINs configurados precisam ter ao menos 10 caracteres. Sessões ficam na memória do servidor, expiram após 8 horas de inatividade e são encerradas ao reiniciá-lo.
+- O painel não possui autenticação ou controle de acesso. Execute-o apenas em uma máquina e rede local confiáveis; todos os dispositivos que alcançam o servidor podem administrar os dados.
 - É um servidor local de processo único, apropriado para operação de pequeno porte em uma rede confiável. Não oferece balanceamento, TLS, autenticação multiusuário ou replicação de banco. O limite prático depende de CPU, memória, largura de banda e quantidade de fontes OBS conectadas; não há promessa de capacidade ilimitada.
 - As saídas são públicas na rede local por URL. Trate os links como informação operacional e não exponha o serviço a redes não confiáveis.
 

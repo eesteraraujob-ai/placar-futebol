@@ -484,7 +484,10 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .score-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 8px 0 13px; }
 .score-correction { display: flex; align-items: center; justify-content: center; gap: 8px; color: #888; font-size: .62rem; }
 .score-correction .icon-button { width: 27px; height: 27px; }
-.match-console .timer-panel { margin-top: 4px; }
+.match-console .timer-panel { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); margin-top: 4px; }
+.match-console .timer-display { grid-column: 2; min-width: 0; text-align: center; }
+.match-console .timer-display .eyebrow { text-align: center; }
+.match-console .timer-buttons { grid-column: 3; justify-content: flex-end; }
 .match-console .timer-display strong { font-size: 1.8rem; }
 .match-console .timer-buttons .button { min-height: 36px; }
 .match-console .period-row { border-bottom: 1px solid #292929; }
@@ -533,6 +536,9 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
   .match-console .score-number { font-size: 1.8rem; gap: 6px; }
   .match-console .score-team .crest-large { width: 39px; height: 39px; }
   .score-goal-button { min-height: 32px; padding: 5px 11px; }
+  .match-console .timer-panel { grid-template-columns: minmax(0,1fr); justify-items: center; }
+  .match-console .timer-display, .match-console .timer-buttons { grid-column: 1; justify-self: center; }
+  .match-console .timer-buttons { justify-content: center; }
   .match-console .period-row { grid-template-columns: 1fr 1fr; }
   .match-console .period-row .button { grid-column: 1 / -1; }
   .match-console .console-bottom { flex-wrap: wrap; }

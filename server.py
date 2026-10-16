@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import base64
-import hmac
 import json
 import mimetypes
 import os
 import queue
 import re
-import secrets
 import socket
 import sqlite3
 import threading
@@ -15,7 +13,6 @@ import time
 import uuid
 from contextlib import contextmanager
 from http import HTTPStatus
-from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -30,20 +27,12 @@ DATABASE = DATA_DIR / "faf.sqlite3"
 PORT = int(os.environ.get("FAF_PORT", "8765"))
 MAX_REQUEST_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_BYTES = 3 * 1024 * 1024
-SESSION_SECONDS = 8 * 60 * 60
 KEYRING_SERVICE = "FAF Placar - YouTube"
 SUPPORTED_COLLECTIONS = {"teams", "competitions", "cameramen", "matches", "settings"}
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
 
 LOCK = threading.RLock()
 SUBSCRIBERS: dict[str, set[queue.Queue[str]]] = {}
-SESSIONS: dict[str, tuple[float, str]] = {}
-ADMIN_PIN = os.environ.get("FAF_ADMIN_PIN")
-GENERATED_PIN = not ADMIN_PIN
-if not ADMIN_PIN:
-    ADMIN_PIN = secrets.token_urlsafe(15)
-if len(ADMIN_PIN) < 10:
-    raise SystemExit("FAF_ADMIN_PIN deve conter ao menos 10 caracteres.")
 
 
 def connect() -> sqlite3.Connection:
@@ -285,31 +274,6 @@ class Handler(BaseHTTPRequestHandler):
             raise RequestError(HTTPStatus.BAD_REQUEST, "O corpo da requisição deve ser um objeto.")
         return value
 
-    def session_id(self) -> str | None:
-        cookie = SimpleCookie()
-        try:
-            cookie.load(self.headers.get("Cookie", ""))
-        except CookieError:
-            return None
-        morsel = cookie.get("faf_session")
-        if not morsel:
-            return None
-        session_id = morsel.value
-        with LOCK:
-            session = SESSIONS.get(session_id)
-            if not session:
-                return None
-            expires, address = session
-            if expires < time.time() or address != self.client_address[0]:
-                SESSIONS.pop(session_id, None)
-                return None
-            SESSIONS[session_id] = (time.time() + SESSION_SECONDS, address)
-        return session_id
-
-    def require_session(self) -> None:
-        if not self.session_id():
-            raise RequestError(HTTPStatus.UNAUTHORIZED, "Sua sessão expirou. Entre novamente com o PIN.")
-
     def require_same_origin(self) -> None:
         if self.headers.get("X-FAF-Action") != "1":
             raise RequestError(HTTPStatus.FORBIDDEN, "A ação não passou pela verificação de origem.")
@@ -318,9 +282,6 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
         try:
-            if path == "/api/session":
-                self.send_json(HTTPStatus.OK, {"authenticated": self.session_id() is not None})
-                return
             if path == "/api/time":
                 self.send_json(HTTPStatus.OK, {"serverTime": now_ms()})
                 return
@@ -335,7 +296,6 @@ class Handler(BaseHTTPRequestHandler):
                 self.stream_events((query.get("matchId") or ["*"])[0])
                 return
             if path.startswith("/api/"):
-                self.require_session()
                 self.handle_api_get(path)
                 return
             if path == "/" or path.startswith("/overlay/"):
@@ -403,33 +363,6 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             body = self.read_json()
-            if path == "/api/login":
-                submitted = str(body.get("pin", ""))
-                if not hmac.compare_digest(submitted.encode(), (ADMIN_PIN or "").encode()):
-                    raise RequestError(HTTPStatus.UNAUTHORIZED, "PIN incorreto.")
-                session_id = secrets.token_urlsafe(32)
-                with LOCK:
-                    SESSIONS[session_id] = (time.time() + SESSION_SECONDS, self.client_address[0])
-                self.send_json(
-                    HTTPStatus.OK,
-                    {"authenticated": True},
-                    {"Set-Cookie": "faf_session=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=%d" % (session_id, SESSION_SECONDS)},
-                )
-                return
-            if path == "/api/logout":
-                self.require_session()
-                self.require_same_origin()
-                session_id = self.session_id()
-                if session_id:
-                    with LOCK:
-                        SESSIONS.pop(session_id, None)
-                self.send_json(
-                    HTTPStatus.OK,
-                    {"authenticated": False},
-                    {"Set-Cookie": "faf_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"},
-                )
-                return
-            self.require_session()
             self.require_same_origin()
             if path.startswith("/api/matches/") and path.endswith("/actions"):
                 self.handle_match_action(path.split("/")[-2], body)
@@ -451,7 +384,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_PUT(self) -> None:
         path = urlparse(self.path).path
         try:
-            self.require_session()
             self.require_same_origin()
             body = self.read_json()
             parts = [part for part in path.split("/") if part]
@@ -467,7 +399,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self) -> None:
         path = urlparse(self.path).path
         try:
-            self.require_session()
             self.require_same_origin()
             parts = [part for part in path.split("/") if part]
             if len(parts) == 4 and parts[:2] == ["api", "cameramen"] and parts[3] == "secret":
@@ -781,10 +712,7 @@ def main() -> None:
     server = AppServer(("0.0.0.0", PORT), Handler)
     print("FAF Controle de Placar disponível em http://localhost:%d" % PORT)
     print("Acesso na rede local: http://%s:%d" % (local_ip(), PORT))
-    if GENERATED_PIN:
-        print("PIN administrativo temporário (válido enquanto o servidor estiver configurado): %s" % ADMIN_PIN)
-        print("Defina FAF_ADMIN_PIN no ambiente para usar um PIN próprio.")
-    print("Não exponha este servidor a redes públicas. A sessão expira em 8 horas.")
+    print("Painel sem login: restrinja o acesso a uma rede local confiável.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
